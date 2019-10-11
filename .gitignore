@@ -1,1 +1,5 @@
 Info.txt
+log.txt
+.vscode
+__pycache__/login.cpython-37.pyc
+__pycache__/logout.cpython-37.pyc

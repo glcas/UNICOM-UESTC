@@ -1,7 +1,6 @@
 # 这个脚本应该放到任务计划，触发器设为登陆时，条件为停止现有实例；考虑是否勾选“只有在以下网络可用时启动”之选项？
 # 运行逻辑：每一次登陆windows账号时登陆WiFi，锁定时下线
 # 需与logout脚本放在同一目录下
-# 待调试的地方：登陆要求的是否是外网IP；延迟时间和间隔时间设置；cookie的传送已被忽略
 # 最后打包成exe
 
 import socket
@@ -9,7 +8,6 @@ import time
 
 import pywifi
 import requests
-from bs4 import BeautifulSoup
 from ping3 import ping
 
 
@@ -37,10 +35,9 @@ def conwifi():
     profile.ssid = 'UNICOM-UESTC'
     profile.auth = pywifi.const.AUTH_ALG_OPEN
     profile.akm.append(pywifi.const.AKM_TYPE_NONE)
-    iface.disconnect()
     temProfile = iface.add_network_profile(profile)
     iface.connect(temProfile)
-    while iface.status() == pywifi.const.IFACE_CONNECTING:
+    while iface.status() == pywifi.const.IFACE_DISCONNECTED:
         time.sleep(1)
     if iface.status() == pywifi.const.IFACE_DISCONNECTED:
         for i in range(3):
@@ -55,10 +52,12 @@ def conwifi():
         return -1
     if iface.status() == pywifi.const.IFACE_CONNECTED:
         return 0
+    else:
+        return -1
 
 
 def connect(ip, username, password):
-    """ if uuid==-1, the others is None, means that login failed """
+    """ if first parameter==-1, the others is None, means that login failed """
     try:
         firstPage = requests.get(
             'http://221.10.255.233:8088/showlogin.do',
@@ -81,13 +80,10 @@ def connect(ip, username, password):
                 'Cache-Control': 'max-age=0'
             },
             timeout=6)
-        firstSoup = BeautifulSoup(firstPage.text, 'lxml')
-        loggerID = firstSoup.find(
-            'span', id='line73'
-        ).next_sibling.next_sibling.next_sibling.next_sibling.string  # consider change to str?
-        CSRFToken = firstSoup.find(
-            'span', id='line91').parent.next_sibling.find_all(
-                'a', class_='attribute-value')[-1].string
+        loggerID = firstPage.text[firstPage.text.index('logger') +
+                                  36:firstPage.text.index('logger') + 53]
+        CSRFToken = firstPage.text[firstPage.text.index('CSRFToken') +
+                                   21:firstPage.text.index('CSRFToken') + 53]
         loginHeaders = {
             'Host':
             '221.10.255.233:8088',
@@ -127,18 +123,19 @@ def connect(ip, username, password):
             'successpage': '/GWlanRes/pppoe/OnlineURL/pc/index.jsp',
             'CSRFToken_HW': CSRFToken
         }
-        loginPage = requests.post(
-            'http://221.10.255.233:8088//LoginServlet',
-            headers=loginHeaders,
-            data=loginPayload,
-            timeout=6)
+        loginPage = requests.post('http://221.10.255.233:8088//LoginServlet',
+                                  headers=loginHeaders,
+                                  data=loginPayload,
+                                  timeout=6)
         JSESSIONID = loginPage.headers['Set-Cookie'].split('=')[1][:-6]
-        loginSoup = BeautifulSoup(loginPage.text, 'lxml')
-        uuid = loginSoup.find(
-            'span', id='line189').next_sibling.split('=')[2][:-4]
-        return uuid, JSESSIONID, loggerID, CSRFToken
+        uuid = loginPage.text[loginPage.text.index('UUID') +
+                              5:loginPage.text.index('UUID') + 37]
+        logoutUrl = loginPage.text[loginPage.text.index('gurl') +
+                                   8:loginPage.text.index('gurl') +
+                                   187] + '&ATTRIBUTE_UUID=' + uuid
+        return JSESSIONID, logoutUrl
     except requests.exceptions.RequestException:
-        return -1, None, None, None
+        return -1, None
 
 
 def defaultPing():
@@ -158,20 +155,22 @@ def defaultPing():
 
 
 def main():
-    while True:  # 登出操作是在锁定时！while true？
+    while True:
         err = conwifi()
         errTime = 0
+        f = open('log.txt', 'a')
         if err == -1:
+            f.write('{}  connect AP failed\n'.format(time.ctime()))
             break
         ip = socket.gethostbyname(socket.gethostname())
         username, password = '02802118659', '184312'
-        uuid, JSESSIONID, loggerID, CSRFToken = connect(ip, username, password)
-        if uuid != -1:  # write the four data to disk with no error
+        JSESSIONID, logoutUrl = connect(ip, username, password)
+        if JSESSIONID != -1:  # write the data to disk with no error
+            f.write('{}  login success\n'.format(time.ctime()))
             with open('Info.txt', 'w') as f:
-                f.write('JSESSIONID={}\nCSRFToken={}\nuuid={}\nloggerID={}\n'.
-                        format(JSESSIONID, CSRFToken, uuid, loggerID))
+                f.write('JSESSIONID={}\n{}'.format(JSESSIONID, logoutUrl))
         while True:
-            if uuid == -1:
+            if JSESSIONID == -1:
                 errTime += 1
                 break
             pingAns = defaultPing()
@@ -186,6 +185,7 @@ def main():
                 time.sleep(180)
         time.sleep(10)
         if errTime > 6:
+            f.write('{}  with using Internet failed\n'.format(time.ctime()))
             break
     pywifi.PyWiFi().interfaces()[0].disconnect()
 
