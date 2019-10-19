@@ -1,5 +1,3 @@
-# 这个脚本应该放到任务计划，触发器设为登陆时，条件为停止现有实例；考虑是否勾选“只有在以下网络可用时启动”之选项？
-# 运行逻辑：每一次登陆windows账号时登陆WiFi，锁定时下线
 # 需与logout脚本放在同一目录下
 # 最后打包成exe
 
@@ -15,12 +13,12 @@ def conwifi():
     wifi = pywifi.PyWiFi()
     iface = wifi.interfaces()[0]
     inRegion = False
-    while iface.status() == pywifi.const.IFACE_INACTIVE:
-        time.sleep(1)
+    #    while iface.status() == pywifi.const.IFACE_INACTIVE:
+    #        time.sleep(1)
     for i in range(3):
         iface.scan()
-        while iface.status() == pywifi.const.IFACE_SCANNING:
-            time.sleep(0.5)
+        #        while iface.status() == pywifi.const.IFACE_SCANNING:
+        #            time.sleep(0.5)
         APList = iface.scan_results()
         for data in APList:
             if data.ssid == 'UNICOM-UESTC':
@@ -36,24 +34,37 @@ def conwifi():
     profile.auth = pywifi.const.AUTH_ALG_OPEN
     profile.akm.append(pywifi.const.AKM_TYPE_NONE)
     temProfile = iface.add_network_profile(profile)
+    '''
     iface.connect(temProfile)
     while iface.status() == pywifi.const.IFACE_DISCONNECTED:
         time.sleep(1)
     if iface.status() == pywifi.const.IFACE_DISCONNECTED:
+    '''
+    for i in range(3):
+        iface.connect(temProfile)
+        time.sleep(3)
         for i in range(3):
-            time.sleep(3)
-            iface.connect(temProfile)
-            while iface.status() == pywifi.const.IFACE_CONNECTING:
-                time.sleep(1)
-            if iface.status() == pywifi.const.IFACE_DISCONNECTED:
-                continue
-            if iface.status() == pywifi.const.IFACE_CONNECTED:
-                return 0
+            if iface.status() != pywifi.const.IFACE_CONNECTED:
+                time.sleep(3)
+            else:
+                break
+        if iface.status() == pywifi.const.IFACE_CONNECTED:
+            break
+    if iface.status() == pywifi.const.IFACE_CONNECTED:
+        return 0
+    else:
+        return -1
+
+
+'''
+        if iface.status() == pywifi.const.IFACE_CONNECTED:
+            return 0
         return -1
     if iface.status() == pywifi.const.IFACE_CONNECTED:
         return 0
     else:
         return -1
+'''
 
 
 def connect(ip, username, password):
