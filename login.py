@@ -13,12 +13,8 @@ def conwifi():
     wifi = pywifi.PyWiFi()
     iface = wifi.interfaces()[0]
     inRegion = False
-    #    while iface.status() == pywifi.const.IFACE_INACTIVE:
-    #        time.sleep(1)
     for i in range(3):
         iface.scan()
-        #        while iface.status() == pywifi.const.IFACE_SCANNING:
-        #            time.sleep(0.5)
         APList = iface.scan_results()
         for data in APList:
             if data.ssid == 'UNICOM-UESTC':
@@ -34,12 +30,6 @@ def conwifi():
     profile.auth = pywifi.const.AUTH_ALG_OPEN
     profile.akm.append(pywifi.const.AKM_TYPE_NONE)
     temProfile = iface.add_network_profile(profile)
-    '''
-    iface.connect(temProfile)
-    while iface.status() == pywifi.const.IFACE_DISCONNECTED:
-        time.sleep(1)
-    if iface.status() == pywifi.const.IFACE_DISCONNECTED:
-    '''
     for i in range(3):
         iface.connect(temProfile)
         time.sleep(3)
@@ -54,17 +44,6 @@ def conwifi():
         return 0
     else:
         return -1
-
-
-'''
-        if iface.status() == pywifi.const.IFACE_CONNECTED:
-            return 0
-        return -1
-    if iface.status() == pywifi.const.IFACE_CONNECTED:
-        return 0
-    else:
-        return -1
-'''
 
 
 def connect(ip, username, password):
