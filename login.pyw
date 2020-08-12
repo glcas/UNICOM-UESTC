@@ -160,7 +160,7 @@ def main():
         if err == -1:
             f.write('{}  connect AP failed\n'.format(ctime()))
             break
-        username, password = '02802118659', '184312'
+        username, password = 'yourUsername', 'yourPassword'
         JSESSIONID, logoutUrl = connect(username, password)
         if JSESSIONID != -1:  # write the data to disk with no error
             f.write('{}  login success\n'.format(ctime()))
